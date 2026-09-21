@@ -50,7 +50,7 @@ public class CatController : MonoBehaviour
 
     void Jump()
     {
-        if (Input.GetButtonDown("Jump") && Mathf.Abs(rb.velocity.y) < 0.01f)
+        if (Input.GetButtonDown("Jump") && Mathf.Abs(rb.linearVelocity.y) < 0.01f)
         {
             rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
         }

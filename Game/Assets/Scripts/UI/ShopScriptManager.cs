@@ -61,6 +61,18 @@ public class ExpansionShopController : MonoBehaviour
     /// </summary>
     public void PurchaseExpansionPack(ExpansionPack targetPack)
     {
+        if (targetPack == null || SaveSystem.Instance == null || SaveSystem.Instance.currentProgress == null)
+        {
+            Debug.LogError("Cannot purchase an invalid expansion or before save data is ready.");
+            return;
+        }
+
+        if (SaveSystem.Instance.currentProgress.purchasedExpansionIDs.Contains(targetPack.expansionID))
+        {
+            Debug.Log($"Expansion already owned: {targetPack.packTitle}");
+            return;
+        }
+
         Debug.Log($"Processing real-money validation request for Expansion Pack: {targetPack.packTitle}...");
 
         // --- Payment Middleware Simulation Link ---

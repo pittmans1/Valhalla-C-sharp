@@ -14,20 +14,29 @@ public class SmashableProp : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (isBroken) return;
-
         if (collision.relativeVelocity.magnitude > breakForceThreshold)
         {
-            isBroken = true;
-            Debug.Log($"{itemTypeTag} was completely smashed with a force of {collision.relativeVelocity.magnitude}!");
-            
-            // Back to a clean, standard, reliable single-line manager check!
-            if (GameModeManager.Instance != null)
-            {
-                GameModeManager.Instance.OnItemDestroyed(itemTypeTag, pointValue);
-            }
-            
-            Destroy(gameObject, 0.1f);
+            Break(collision.relativeVelocity.magnitude);
         }
+    }
+
+    public void ApplyExplosion()
+    {
+        Break(breakForceThreshold + 1f);
+    }
+
+    private void Break(float force)
+    {
+        if (isBroken) return;
+
+        isBroken = true;
+        Debug.Log($"{itemTypeTag} was completely smashed with a force of {force}!");
+
+        if (GameModeManager.Instance != null)
+        {
+            GameModeManager.Instance.OnItemDestroyed(itemTypeTag, pointValue);
+        }
+
+        Destroy(gameObject, 0.1f);
     }
 }

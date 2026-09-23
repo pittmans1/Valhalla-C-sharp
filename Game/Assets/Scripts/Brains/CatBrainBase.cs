@@ -17,6 +17,11 @@ public class CatBrainController : MonoBehaviour
         movementWorker = GetComponent<CatMovement>();
         grabberWorker = GetComponent<CatGrabber>();
         pawsWorker = GetComponent<CatPaws>();
+
+        if (GameModeManager.Instance != null)
+        {
+            GameModeManager.Instance.RegisterCat(this);
+        }
     }
 
     // Pure abstract API triggers isolated from raw device configurations
@@ -35,7 +40,7 @@ public class CatBrainController : MonoBehaviour
     {
         if (isSleeping) return;
 
-        Health -= (int)damageAmount;
+        Health = Mathf.Max(0, Health - Mathf.RoundToInt(damageAmount));
         if (Health <= 0)
         {
             isSleeping = true;

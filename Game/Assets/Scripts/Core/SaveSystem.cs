@@ -36,18 +36,48 @@ public class SaveSystem : MonoBehaviour
 
     public void SaveGameData()
     {
+        EnsureProgressCollections();
         string jsonOutput = JsonUtility.ToJson(currentProgress, true);
-        File.WriteAllText(saveFilePath, jsonOutput);
-        Debug.Log("Game progression synced to disk securely.");
+        string temporaryPath = saveFilePath + ".tmp";
+
+        try
+        {
+            File.WriteAllText(temporaryPath, jsonOutput);
+            File.Copy(temporaryPath, saveFilePath, true);
+            File.Delete(temporaryPath);
+        }
+        catch (IOException exception)
+        {
+            Debug.LogError($"Could not save progression: {exception.Message}");
+        }
     }
 
     public void LoadGameData()
     {
         if (File.Exists(saveFilePath))
         {
-            string jsonText = File.ReadAllText(saveFilePath);
-            currentProgress = JsonUtility.FromJson<GameProgressData>(jsonText);
+            try
+            {
+                string jsonText = File.ReadAllText(saveFilePath);
+                currentProgress = JsonUtility.FromJson<GameProgressData>(jsonText) ?? new GameProgressData();
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError($"Could not load progression. Resetting to defaults: {exception.Message}");
+                currentProgress = new GameProgressData();
+            }
         }
+
+        EnsureProgressCollections();
+    }
+
+    private void EnsureProgressCollections()
+    {
+        currentProgress ??= new GameProgressData();
+        currentProgress.unlockedCatIDs ??= new List<string>();
+        currentProgress.unlockedClothesIDs ??= new List<string>();
+        currentProgress.unlockedAchievements ??= new List<string>();
+        currentProgress.purchasedExpansionIDs ??= new List<string>();
     }
 
     // --- Progression, Lobbies, and Achievement Logic ---

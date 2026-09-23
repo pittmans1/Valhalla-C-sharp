@@ -181,7 +181,7 @@ public class HumanBrain : MonoBehaviour
 
     private void FindClosestActiveCatPlayer()
     {
-        CatBrainController[] catPool = FindObjectsByType<CatBrainController>(FindObjectsSortMode.None);
+        CatBrainController[] catPool = FindObjectsByType<CatBrainController>();
         float closestDistance = aiScanRadius;
         CatBrainController bestTarget = null;
 

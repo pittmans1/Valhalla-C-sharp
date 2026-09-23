@@ -37,6 +37,15 @@ public class GameModeManager : MonoBehaviour
         }
     }
 
+    public void ResetMatch()
+    {
+        matchTimer = 180f;
+        totalCatDestructionPoints = 0;
+        destroyedItems.Clear();
+        activeCats.Clear();
+        isMatchActive = true;
+    }
+
     private void Update()
     {
         if (!isMatchActive) return;
@@ -50,7 +59,7 @@ public class GameModeManager : MonoBehaviour
 
     public void RegisterCat(CatBrainController cat)
     {
-        if (!activeCats.Contains(cat))
+        if (cat != null && !activeCats.Contains(cat))
         {
             activeCats.Add(cat);
         }
@@ -78,6 +87,9 @@ public class GameModeManager : MonoBehaviour
 
     public void CheckCatDownStates()
     {
+        activeCats.RemoveAll(cat => cat == null);
+        if (activeCats.Count == 0) return;
+
         bool allCatsDown = true;
         foreach (var cat in activeCats)
         {

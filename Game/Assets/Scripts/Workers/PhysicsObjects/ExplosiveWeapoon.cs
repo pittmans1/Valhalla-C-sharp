@@ -56,8 +56,7 @@ public class ExplosiveWeapon : MonoBehaviour
             // Shatter environmental smashable items in the shockwave
             else if (target.TryGetComponent<SmashableProp>(out SmashableProp prop))
             {
-                // Force a direct collision simulation to break it instantly
-                prop.SendMessage("OnCollisionEnter", new Collision()); 
+                prop.ApplyExplosion();
             }
         }
 

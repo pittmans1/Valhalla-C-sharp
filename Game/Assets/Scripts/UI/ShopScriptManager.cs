@@ -28,6 +28,8 @@ public class ExpansionShopController : MonoBehaviour
 
     private void PopulateExpansionStoreUI()
     {
+        if (shopListContainer == null || shopItemButtonPrefab == null) return;
+
         // Clear old shop entries if reloading screen
         foreach (Transform child in shopListContainer) Destroy(child.gameObject);
 
@@ -41,23 +43,25 @@ public class ExpansionShopController : MonoBehaviour
 
             // Check if player already owns it
             Button btn = buttonObj.GetComponent<Button>();
-            bool ownsPack = SaveSystem.Instance.currentProgress.purchasedExpansionIDs.Contains(pack.expansionID) || pack.isUnlockedByDefault;
+            bool ownsPack = pack.isUnlockedByDefault ||
+                (SaveSystem.Instance != null && SaveSystem.Instance.currentProgress != null &&
+                 SaveSystem.Instance.currentProgress.purchasedExpansionIDs.Contains(pack.expansionID));
 
             if (ownsPack)
             {
                 if (itemText != null) itemText.text += " (Owned)";
-                btn.interactable = false;
+                if (btn != null) btn.interactable = false;
             }
             else
             {
-                // Hook up purchase button callback dynamically
-                btn.onClick.AddListener(() => PurchaseExpansionPack(pack));
+                if (itemText != null) itemText.text += " (Unavailable)";
+                if (btn != null) btn.interactable = false;
             }
         }
     }
 
     /// <summary>
-    /// Simulates currency transactions, overrides level/cat matrices, and saves progress to disk.
+    /// Purchases remain disabled until a platform provider validates the transaction.
     /// </summary>
     public void PurchaseExpansionPack(ExpansionPack targetPack)
     {
@@ -73,36 +77,6 @@ public class ExpansionShopController : MonoBehaviour
             return;
         }
 
-        Debug.Log($"Processing real-money validation request for Expansion Pack: {targetPack.packTitle}...");
-
-        // --- Payment Middleware Simulation Link ---
-        // (This is exactly where you link Steam DLC APIs or In-App Purchase plugins later)
-        bool paymentSuccessful = true; 
-        // ------------------------------------------
-
-        if (paymentSuccessful)
-        {
-            // 1. Log pack identifier to progress file
-            SaveSystem.Instance.currentProgress.purchasedExpansionIDs.Add(targetPack.expansionID);
-
-            // 2. Inject all expansion cats into user profile directly, bypassing story progress
-            foreach (string catID in targetPack.includedCatIDs)
-            {
-                SaveSystem.Instance.UnlockCatBreed(catID);
-            }
-
-            // 3. Push map variants directly to your infinite generation system pools
-            if (InfiniteLevelGenerator.Instance != null)
-            {
-                InfiniteLevelGenerator.Instance.InjectExpansionMaps(targetPack.includedMapPrefabs);
-            }
-
-            // 4. Force serialization to file
-            SaveSystem.Instance.SaveGameData();
-            
-            // Refresh shop buttons instantly
-            PopulateExpansionStoreUI();
-            Debug.Log($"Successfully unlocked Expansion Pack content: {targetPack.packTitle}!");
-        }
+        Debug.LogWarning($"Purchase blocked for {targetPack.packTitle}: no store provider is configured. No unlock was recorded.");
     }
 }

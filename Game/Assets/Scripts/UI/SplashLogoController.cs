@@ -7,11 +7,12 @@ public class SplashLogoController : MonoBehaviour
     [Header("UI Elements Transformers")]
     [SerializeField] private RectTransform baseLogoText;
     [SerializeField] private RectTransform snotDotElement;
+    [SerializeField] private Image snotImageComponent;
     [SerializeField] private CanvasGroup globalSplashGroup;
 
     [Header("Motion Animation Timings")]
-    [SerializeField] private Vector2 snotStartAnchorPos = new Vector2(0f,600f);
-    [SerializeField] private Vector2 snotTargetAnchorPos = new Vector2(32f, 85f);
+    private Vector2 snotStartAnchorPos;
+    private Vector2 snotTargetAnchorPos;
     [SerializeField] private float dropDuration = 0.8f;
     [SerializeField] private float splatBounceDuration = 0.4f;
 
@@ -19,74 +20,175 @@ public class SplashLogoController : MonoBehaviour
     [SerializeField] private AudioClip snotImpactSplatSound;
     [SerializeField] private AnimationCurve dropCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
     [SerializeField] private MenuController menuControllerUI;
+
+    [Header(" Slime Morphing")]
+    [SerializeField] private Sprite snotSplatSprite; 
+
     private void Start()
     {
-        globalSplashGroup.alpha = 1f;
-        snotDotElement.anchoredPosition = snotStartAnchorPos;
-        snotDotElement.localScale = new Vector3(0.3f, 1.8f, 1.0f);
+        if (globalSplashGroup != null) globalSplashGroup.alpha = 1f;
+
+        // AUTOMATIC CATCH: If the inspector slot was left empty, find it automatically!
+        if (snotImageComponent == null && snotDotElement != null)
+        {
+            snotImageComponent = snotDotElement.GetComponent<Image>();
+        }
+
+        // FORCE CORRECT VECTORS: Straight drop down the vertical center axis line
+        snotStartAnchorPos = new Vector2(0f, 600f);
+        snotTargetAnchorPos = new Vector2(-19.3f, 12.79f); // Centered straight over the "I" stem
+
+        // Fix hex coloring safely using Unity's built-in converter
+        if (snotImageComponent != null)
+        {
+            Color initialColor;
+            if (ColorUtility.TryParseHtmlString("#1DFA35", out initialColor))
+            {
+                snotImageComponent.color = initialColor;
+            }
+            else
+            {
+                snotImageComponent.color = Color.white;
+            }
+        }
+
+        // Align pivots to center so stretching down doesn't deflect coordinates sideways
+        if (snotDotElement != null)
+        {
+            snotDotElement.pivot = new Vector2(0.5f, 0.5f);
+            snotDotElement.anchoredPosition = snotStartAnchorPos;
+            snotDotElement.localScale = new Vector3(0.6f, 1.6f, 1.0f); // Clean initial stretched drop shape
+        }
 
         StartCoroutine(ExecuteSpittyLogoSequence());
     }
 
     private IEnumerator ExecuteSpittyLogoSequence()
     {
-        // Fade in the logo
-        yield return new WaitForSeconds(0.3f); // inital delay Dark screen
+        yield return new WaitForSeconds(0.3f); // Initial delay dark screen
+        
         float elapsed = 0f;
+        Vector3 initialDropScale = new Vector3(0.6f, 1.6f, 1.0f);
+        Vector3 terminalDropScale = new Vector3(0.8f, 1.2f, 1.0f);
+
+        // 1. FALL PHASE
         while (elapsed < dropDuration)
         {
             elapsed += Time.deltaTime;
             float normalizedProgress = elapsed / dropDuration;
             float curvedProgress = dropCurve.Evaluate(normalizedProgress);
 
-            // interpolate vector pos smoothly down the ui frame canvas
-            snotDotElement.anchoredPosition = Vector2.Lerp(snotStartAnchorPos, snotTargetAnchorPos, curvedProgress);
-            // normalize scale length as it nears structural terminal Veloc traget
-            snotDotElement.localScale = Vector3.Lerp(new Vector3(0.3f, 1.8f, 1.0f), new Vector3(1.0f, 1.0f, 1.0f), curvedProgress);
+            if (snotDotElement != null)
+            {
+                snotDotElement.anchoredPosition = Vector2.Lerp(snotStartAnchorPos, snotTargetAnchorPos, curvedProgress);
+                snotDotElement.localScale = Vector3.Lerp(initialDropScale, terminalDropScale, curvedProgress);
+            }
             yield return null;
         }
 
-        snotDotElement.anchoredPosition = snotTargetAnchorPos;
+        if (snotDotElement != null) snotDotElement.anchoredPosition = snotTargetAnchorPos;
+
+        // 2. IMPACT FLASH: Swap sprite texture to the splat and inject the toxic neon green color values
+        if (snotImageComponent != null && snotSplatSprite != null)
+        {
+            snotImageComponent.sprite = snotSplatSprite;
+            
+            Color impactColor;
+            if (ColorUtility.TryParseHtmlString("#26E63B", out impactColor))
+            {
+                snotImageComponent.color = impactColor;
+            }
+            else
+            {
+                snotImageComponent.color = new Color(0.18f, 0.80f, 0.24f, 1.0f);
+            }
+        }
+
         if (AudioManagerHub.Instance != null && snotImpactSplatSound != null)
         {
             AudioManagerHub.Instance.PlaySpatialExplosiveSFX(snotImpactSplatSound, Vector3.zero, 0.8f);
         }
 
+        // 3. JUICY SQUASH & STRETCH BOUNCE PHASE
         elapsed = 0f;
-
-        Vector3 squishedScale = new Vector3(1.6f, 0.5f, 1.0f);
+        Vector3 squishedScale = new Vector3(1.8f, 0.4f, 1.0f); 
         Vector3 normalScale = new Vector3(1.0f, 1.0f, 1.0f);
+        Vector2 textOriginalAnchorPos = baseLogoText != null ? baseLogoText.anchoredPosition : Vector2.zero;
 
-        while (elapsed  < splatBounceDuration)
+        while (elapsed < splatBounceDuration)
         {
             elapsed += Time.deltaTime;
             float normalizedBounceProgress = elapsed / splatBounceDuration;
-            //elastive sine wave
+            
             float bounceScaleEvaluation = Mathf.Sin(normalizedBounceProgress * Mathf.PI * 2.5f) * (1f - normalizedBounceProgress);
-            snotDotElement.localScale = normalScale + (squishedScale - normalScale) * bounceScaleEvaluation;
-            baseLogoText.anchoredPosition = new Vector2(Random.Range(-3f, 3f), Random.Range(-3f, 3f));
+            
+            if (snotDotElement != null)
+            {
+                snotDotElement.localScale = normalScale + (squishedScale - normalScale) * bounceScaleEvaluation;
+            }
+            
+            if (baseLogoText != null)
+            {
+                float shakeStrength = 6f * (1f - normalizedBounceProgress);
+                baseLogoText.anchoredPosition = textOriginalAnchorPos + new Vector2(Random.Range(-shakeStrength, shakeStrength), Random.Range(-shakeStrength, shakeStrength));
+            }
            
             yield return null;
         }
-        snotDotElement.localScale = normalScale;
-        baseLogoText.anchoredPosition = Vector2.zero;
-        yield return new WaitForSeconds(1.2f);
 
-        elapsed = 0f;
-        while (elapsed < 0.5f)
+        if (snotDotElement != null) snotDotElement.localScale = normalScale;
+        if (baseLogoText != null) baseLogoText.anchoredPosition = textOriginalAnchorPos;
+        
+        yield return new WaitForSeconds(1.2f); 
+
+        // 4. FADE OUT EXIT PHASE
+         elapsed = 0f;
+        float textFadeDuration = 0.5f;
+
+        // Step A: Disconnect the Text from the canvas group or fade it independently
+        // If your text components are wrapped, we can manually fade its color channel transparency alpha
+        Graphic textComponent = baseLogoText.GetComponent<Graphic>();
+        Graphic productionsTextComponent = baseLogoText.transform.parent.Find("Productions")?.GetComponent<Graphic>(); 
+        // Note: Replace "Productions" with your exact secondary text object name if split!
+
+        while (elapsed < textFadeDuration)
         {
             elapsed += Time.deltaTime;
-            globalSplashGroup.alpha = 1.0f - (elapsed / 0.5f);
+            float t = elapsed / textFadeDuration;
+
+            // Smoothly dissolve just the text labels away into the dark purple matrix background
+            if (textComponent != null) textComponent.color = Color.Lerp(textComponent.color, new Color(1f, 1f, 1f, 0f), t);
+            
             yield return null;
         }
 
-        globalSplashGroup.alpha = 0f;
-        gameObject.SetActive(false);
+        // Step B: Slime Surge! Rocket the snot dot directly forward along the Z/Scale plane
+        elapsed = 0f;
+        float surgeDuration = 0.4f;
+        Vector3 initialSurgeScale = snotDotElement.localScale;
+        
+        // Massive destination profile matrix to swallow a standard 1080p canvas grid layout entirely
+        Vector3 terminalSurgeScale = new Vector3(120f, 120f, 1.8f); 
 
-        if ( menuControllerUI != null)
+        while (elapsed < surgeDuration)
         {
-            menuControllerUI.ShowHomeScreen();
+            elapsed += Time.deltaTime;
+            float normalizedSurgeProgress = elapsed / surgeDuration;
+            
+            // Fast exponential acceleration curve mimicking a rapid physics explosive force rush
+            float curvedSurgeProgress = normalizedSurgeProgress * normalizedSurgeProgress * normalizedSurgeProgress;
+
+            if (snotDotElement != null)
+            {
+                snotDotElement.localScale = Vector3.Lerp(initialSurgeScale, terminalSurgeScale, curvedSurgeProgress);
+            }
+            yield return null;
         }
 
+        yield return new WaitForSeconds(0.1f); // Brief moment of total blindness while screen is covered in green slime
+
+        // Step C: Hand execution control cleanly over to your physical Main Menu level scene zone
+        Debug.Log("[SplashLogoController] Screen swallowed by snot. Swapping level layers now...");
+        UnityEngine.SceneManagement.SceneManager.LoadScene(1);
     }
 }

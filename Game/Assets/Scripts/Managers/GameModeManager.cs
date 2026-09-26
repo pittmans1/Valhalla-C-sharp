@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public enum GameModeType { Story, ChaosPvP, BustedMode, CoOpVsAI }
 
@@ -44,6 +45,17 @@ public class GameModeManager : MonoBehaviour
         destroyedItems.Clear();
         activeCats.Clear();
         isMatchActive = true;
+    }
+
+    public void RestartMatch()
+    {
+        if (PlayerSpawner.Instance == null)
+        {
+            Debug.LogError("Cannot restart the match: PlayerSpawner is missing.");
+            return;
+        }
+
+        PlayerSpawner.Instance.RestartCurrentMatch();
     }
 
     private void Update()

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody))]
 public class ExplosiveWeapon : MonoBehaviour
@@ -13,13 +14,7 @@ public class ExplosiveWeapon : MonoBehaviour
     [SerializeField] private GameObject explosionEffectPrefab;
     [SerializeField] private AudioClip explosionSound;
 
-    private Rigidbody rb;
     private bool hasDetonated = false;
-
-    private void Awake()
-    {
-        rb = GetComponent<Rigidbody>();
-    }
 
     private void OnCollisionEnter(Collision collision)
     {
@@ -34,29 +29,28 @@ public class ExplosiveWeapon : MonoBehaviour
 
     public void Detonate()
     {
+        if (hasDetonated) return;
         hasDetonated = true;
         Debug.Log($"Weapon Detonated! {gameObject.name} exploded!");
 
-        // 1. Spatial physics overlap search to catch all targets in range
+        HashSet<Component> processedTargets = new HashSet<Component>();
         Collider[] targetsInRange = Physics.OverlapSphere(transform.position, explosionRadius);
         foreach (var target in targetsInRange)
         {
-            // Push back and damage Cats
-            if (target.TryGetComponent<CatBrainController>(out CatBrainController cat))
+            CatBrainController cat = target.GetComponentInParent<CatBrainController>();
+            if (cat != null && processedTargets.Add(cat))
             {
                 cat.TakeDamage(baseDamage);
-                ApplyBlastForceToRigidbody(target.GetComponent<Rigidbody>());
+                ApplyBlastForceToRigidbody(cat.GetComponent<Rigidbody>());
             }
-            // Stun or damage the Human
-            else if (target.TryGetComponent<HumanBrain>(out HumanBrain human))
+            else if (target.GetComponentInParent<HumanBrain>() is HumanBrain human && processedTargets.Add(human))
             {
-                human.ExecuteSpray(); // Substitute with a human damage/stun system method
-                ApplyBlastForceToRigidbody(target.GetComponent<Rigidbody>());
+                human.ExecuteSpray();
+                ApplyBlastForceToRigidbody(human.GetComponent<Rigidbody>());
             }
-            // Shatter environmental smashable items in the shockwave
-            else if (target.TryGetComponent<SmashableProp>(out SmashableProp prop))
+            else if (target.GetComponentInParent<SmashableProp>() is SmashableProp prop && processedTargets.Add(prop))
             {
-                prop.ApplyExplosion();
+                prop.ApplyExplosion(transform.position, blastForce, explosionRadius);
             }
         }
 
@@ -64,6 +58,11 @@ public class ExplosiveWeapon : MonoBehaviour
         if (explosionEffectPrefab != null)
         {
             Instantiate(explosionEffectPrefab, transform.position, Quaternion.identity);
+        }
+
+        if (explosionSound != null)
+        {
+            AudioSource.PlayClipAtPoint(explosionSound, transform.position);
         }
 
         Destroy(gameObject); // Purge from runtime memory footprint cleanly

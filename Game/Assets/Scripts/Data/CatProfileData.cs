@@ -8,6 +8,7 @@ public class CatProfileData : ScriptableObject
     public string displayBreedName = "Orange Chaos Menace";
     public Sprite characterSelectionIcon;
     public GameObject uniqueBasePrefabModel;
+    
 
     [Header("Locomotion Tuning Balancing")]
     public float movementVelocitySpeed = 9.5f;

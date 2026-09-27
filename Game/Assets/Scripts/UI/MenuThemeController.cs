@@ -47,14 +47,17 @@ public class MenuThemeController : MonoBehaviour
     {
         menuButtonTexts.Clear();
         
-        // Grab all TextMeshPro elements inside the active UI Canvas
-        TextMeshProUGUI[] foundTexts = GameObject.FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None);
+        // CLEAN UNITY 6 API ROUTE: Strips out the deprecated SortMode constraint entirely
+        TextMeshProUGUI[] foundTexts = GameObject.FindObjectsByType<TextMeshProUGUI>(FindObjectsInactive.Include);
+        
         foreach (var txt in foundTexts)
         {
-            // Verify the text is a child of one of your button elements
-            if (txt.gameObject.transform.parent != null && txt.gameObject.transform.parent.gameObject.GetComponent<UnityEngine.UI.Button>() != null)
+            if (txt != null && txt.gameObject.transform.parent != null)
             {
-                menuButtonTexts.Add(txt);
+                if (txt.gameObject.transform.parent.gameObject.GetComponent<UnityEngine.UI.Button>() != null)
+                {
+                    menuButtonTexts.Add(txt);
+                }
             }
         }
     }

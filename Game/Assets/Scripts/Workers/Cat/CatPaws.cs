@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 
 
-[AddComponentMenu("Chaos Cat/Workers/Cat/Cat Paws")]
 public class CatPaws : MonoBehaviour
 {
     [Header("Swipe Attack Settings")]

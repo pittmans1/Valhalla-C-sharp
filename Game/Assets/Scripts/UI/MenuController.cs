@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-[AddComponentMenu("Chaos Cat/UI/Menu Controller")]
 public class MenuController : MonoBehaviour
 {
     public static MenuController Instance;
@@ -13,6 +12,10 @@ public class MenuController : MonoBehaviour
     [SerializeField] private GameObject gameModePanel;
     [SerializeField] private GameObject lobbySelectPanel;
     [SerializeField] private GameObject settingPanel;
+    [SerializeField] private GameObject catFashionPanel;
+    [SerializeField] private GameObject humanFashionPanel;
+    [SerializeField] private GameObject storePanel;
+    [SerializeField] private GameObject gashaponMachinePanel;
 
     [Header("Settings Screen UI Controls")]
     [SerializeField] private Slider masterVolumeSlider;
@@ -38,6 +41,13 @@ public class MenuController : MonoBehaviour
     [SerializeField] private GameObject lobbyRoomPanel;
 
     [Header("Main Menu Buttons")]
+    [SerializeField] private Button storyMode;
+    [SerializeField] private Button onlineLobby;
+    [SerializeField] private Button localCoOp;
+    [SerializeField] private Button gasaphonMachine;
+    [SerializeField] private Button catFashionHub;
+    [SerializeField] private Button humanFashionHub;
+    [SerializeField] private Button settings;
     [SerializeField] private Button hostLobbyButton;
     [SerializeField] private Button joinLobbyButton;
     [SerializeField] private Button quitButton;
@@ -50,12 +60,29 @@ public class MenuController : MonoBehaviour
 
     private void Start()
     {
-        // Set up clean interface layout default safely on boot
-        ShowHomeScreen();
-        LoadAndApplyCachedSettings();
+         // Set up clean interface layout default safely on boot
         InitializeAudioControlSliders();
+        LoadAndApplyCachedSettings();
+        InitializeMainMenuButtonListeners();
         
-        // Hook up UI click events securely
+        // Force home screen to be the only active panel on startup
+        ShowHomeScreen();
+    }
+    /// <summary>
+    /// Connects your physical UI button clicks directly to your custom layout functions.
+    /// </summary>
+    private void InitializeMainMenuButtonListeners()
+    {
+        // Main Core Menu Buttons Hookups
+        if (storyMode != null) storyMode.onClick.AddListener(() => SelectModeAndProceed("story"));
+        if (onlineLobby != null) onlineLobby.onClick.AddListener(ShowLobbyRoom);
+        if (localCoOp != null) localCoOp.onClick.AddListener(() => SelectModeAndProceed("chaospvp"));
+        if (gasaphonMachine != null) gasaphonMachine.onClick.AddListener(showGashaponPanel);
+        if (catFashionHub != null) catFashionHub.onClick.AddListener(showCatFashionPanel);
+        if (humanFashionHub != null) humanFashionHub.onClick.AddListener(showHumanFashionPanel);
+        if (settings != null) settings.onClick.AddListener(ShowSettingsScreen);
+
+        // Sub-Screen Action Buttons Hookups
         if (hostLobbyButton != null) hostLobbyButton.onClick.AddListener(OnHostLobbyClicked);
         if (joinLobbyButton != null) joinLobbyButton.onClick.AddListener(OnJoinLobbyClicked);
         if (quitButton != null) quitButton.onClick.AddListener(OnQuitClicked);
@@ -65,6 +92,10 @@ public class MenuController : MonoBehaviour
     public void ShowGameModeSelection() => SetPanelState(gameModePanel);
     public void ShowLobbyRoom() => SetPanelState(lobbySelectPanel);
     public void ShowSettingsScreen() => SetPanelState(settingPanel);
+    public void showCatFashionPanel () => SetPanelState(catFashionPanel);
+    public void showHumanFashionPanel () => SetPanelState(humanFashionPanel);
+    public void showStorePanel () => SetPanelState(storePanel);
+    public void showGashaponPanel () => SetPanelState(gashaponMachinePanel);
 
     // --- Settings Action Controller Hooks ---
     public void OnSelfMicSliderChanged(float val)
@@ -115,7 +146,9 @@ public class MenuController : MonoBehaviour
             SaveSystem.Instance.SaveGameData();
         }
     }
-
+    /// <summary>
+    /// Dynamic multi-window visibility swapper. Toggles every panel state cleanly.
+    /// </summary>
     private void SetPanelState(GameObject activePanel)
     {
         if (activePanel == null)
@@ -123,10 +156,15 @@ public class MenuController : MonoBehaviour
             Debug.LogWarning("Attempted to set a null panel as active. Operation aborted.");
             return;
         }
+
         if (homeScreenPanel != null) homeScreenPanel.SetActive(homeScreenPanel == activePanel);
         if (gameModePanel != null) gameModePanel.SetActive(gameModePanel == activePanel);
         if (lobbySelectPanel != null) lobbySelectPanel.SetActive(lobbySelectPanel == activePanel);
         if (settingPanel != null) settingPanel.SetActive(settingPanel == activePanel);
+        if (catFashionPanel != null) catFashionPanel.SetActive(catFashionPanel == activePanel);
+        if (humanFashionPanel != null) humanFashionPanel.SetActive(humanFashionPanel == activePanel);
+        if (storePanel != null) storePanel.SetActive(storePanel == activePanel);
+        if (gashaponMachinePanel != null) gashaponMachinePanel.SetActive(gashaponMachinePanel == activePanel);
     }
 
     public void SelectModeAndProceed(string choiceMode)
@@ -274,9 +312,12 @@ public class MenuController : MonoBehaviour
     }
     private void OnDestroy()
     {
-        if (hostLobbyButton != null) hostLobbyButton.onClick.RemoveListener(OnHostLobbyClicked);
-
-        if (joinLobbyButton != null) joinLobbyButton.onClick.RemoveListener(OnJoinLobbyClicked);
-        if (quitButton != null) quitButton.onClick.RemoveListener(OnQuitClicked);
+        if (storyMode != null) storyMode.onClick.RemoveAllListeners();
+        if (onlineLobby != null) onlineLobby.onClick.RemoveAllListeners();
+        if (localCoOp != null) localCoOp.onClick.RemoveAllListeners();if (catFashionHub != null) catFashionHub.onClick.RemoveAllListeners();
+        if (humanFashionHub != null) humanFashionHub.onClick.RemoveAllListeners();
+        if (settings != null) settings.onClick.RemoveAllListeners();if (hostLobbyButton != null) hostLobbyButton.onClick.RemoveAllListeners();
+        if (joinLobbyButton != null) joinLobbyButton.onClick.RemoveAllListeners();
+        if (quitButton != null) quitButton.onClick.RemoveAllListeners();
     }
-    }
+}

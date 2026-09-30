@@ -59,4 +59,46 @@ public class SmashableProp : MonoBehaviour
 
         Destroy(gameObject);
     }
+
+
+    public void reportSmashedPropToDataEngine()
+    {
+        if (SaveSystem.Instance == null || SaveSystem.Instance.GameData == null)
+        {
+            Debug.LogWarning("[DATA SAFETY] Blocked prop smash report tracking: SaveSystem data structure is not online yet.");
+            return;
+        }
+            // Fail-Safe 2: Ensure the stats profile sub-object is valid before modifying properties
+        if (SaveSystem.Instance.GameData.playerStats != null)
+        {
+            SaveSystem.Instance.GameData.playerStats.totalPropsSmashed++;
+        }
+
+        // Fail-Safe 3: Ensure the active mission collection isn't null before entering the loop
+        if (SaveSystem.Instance.GameData.activeMissions == null)
+        {
+            Debug.LogWarning("[DATA SAFETY] Mission list is null. Aborting progression evaluation pass.");
+            return;
+        }
+        SaveSystem.Instance.GameData.playerStats.totalPropsSmashed++;
+
+        foreach (var mission in SaveSystem.Instance.GameData.activeMissions)
+        {
+            if (mission == null) continue;
+            if(mission.completeType == "smashables" && !mission.isCompleted)
+            {
+                if (mission.completeAmount <= 0)
+                {
+                    Debug.LogError($"[DATA ERROR] Mission ID {mission.missionID} possesses an invalid or missing completion target value of: {mission.completeAmount}. Progress halted to prevent exploits.");
+                    continue; 
+                }
+                mission.currentProgress++;
+                if(mission.currentProgress >= mission.completeAmount)
+                {
+                    mission.isCompleted = true;
+                    Debug.Log($"[MISSION COMPLETED] Mission ID {mission.missionID} has been successfully cleared!");
+                }
+            }
+        }
+    }
 }

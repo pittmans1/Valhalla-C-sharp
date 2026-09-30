@@ -93,6 +93,17 @@ public class GashaponMachineController : MonoBehaviour
         if (rewardPopUpPanel != null) rewardPopUpPanel.SetActive(true);
     }
 
+    public void AwardGashaponCosmetic(int customClothingID)
+    {
+        if (!SaveSystem.Instance.GameData.unlockedClothingIDs.Contains(customClothingID))
+        {
+            SaveSystem.Instance.GameData.unlockedClothingIDs.Add(customClothingID);
+            SaveSystem.Instance.GameData.playerStats.totalGashaponSpins++;
+
+            SaveSystem.Instance.SaveGameData();
+        }
+    }
+
 
     private void CloseRewardWindow()
     {

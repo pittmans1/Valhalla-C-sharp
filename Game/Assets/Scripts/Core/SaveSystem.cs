@@ -1,6 +1,9 @@
 using System.IO;
 using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
 using UnityEngine;
+using System;
 
 [System.Serializable]
 public class GameProgressData
@@ -19,8 +22,12 @@ public class SaveSystem : MonoBehaviour
 {
     public static SaveSystem Instance;
     public GameProgressData currentProgress = new GameProgressData();
+    public PlayerSaveProfile GameData {get; private set;} = new PlayerSaveProfile();
     
     private string saveFilePath;
+    private readonly string cryptoSecretKey = "C474sTr0Ph3Sp177Y";
+    [System.NonSerialized] 
+    private System.Collections.Generic.Dictionary<int, CatBreedData> masterCatDatabase;
 
     private void Awake()
     {
@@ -28,23 +35,32 @@ public class SaveSystem : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            saveFilePath = Path.Combine(Application.persistentDataPath, "chaos_save.json");
+            saveFilePath = Path.Combine(Application.persistentDataPath, "CATastrophe_save.json");
             LoadGameData();
         }
         else Destroy(gameObject);
     }
+    private void Start()
+    {
+        // Make sure this matches our registry boot call
+        masterCatDatabase = CatBreedRegistry.GetMasterDatabase();
+        Debug.Log($"[DATABASE] Master Cat Registry online. Loaded {masterCatDatabase.Count} playable breed variants.");
+    }
 
     public void SaveGameData()
     {
-        EnsureProgressCollections();
-        string jsonOutput = JsonUtility.ToJson(currentProgress, true);
-        string temporaryPath = saveFilePath + ".tmp";
+        // EnsureProgressCollections();
+        // string jsonOutput = JsonUtility.ToJson(currentProgress, true);
+        // string temporaryPath = saveFilePath + ".tmp";
 
         try
         {
-            File.WriteAllText(temporaryPath, jsonOutput);
-            File.Copy(temporaryPath, saveFilePath, true);
-            File.Delete(temporaryPath);
+            string cleanJsonText = JsonUtility.ToJson(GameData, true);
+            byte[] encryptedBytes = EncryptStringToBytes(cleanJsonText, cryptoSecretKey);
+            File.WriteAllBytes(saveFilePath, encryptedBytes);
+            // File.WriteAllText(temporaryPath, jsonOutput);
+            // File.Copy(temporaryPath, saveFilePath, true);
+            // File.Delete(temporaryPath);
         }
         catch (IOException exception)
         {
@@ -58,27 +74,40 @@ public class SaveSystem : MonoBehaviour
         {
             try
             {
-                string jsonText = File.ReadAllText(saveFilePath);
-                currentProgress = JsonUtility.FromJson<GameProgressData>(jsonText) ?? new GameProgressData();
+                byte[] encryptedData = File.ReadAllBytes(saveFilePath);
+                string decryptedJsonText = DecryptStringFromBytes(encryptedData, cryptoSecretKey);
+
+                GameData = JsonUtility.FromJson<PlayerSaveProfile>(decryptedJsonText);
+                // string jsonText = File.ReadAllText(saveFilePath);
+                // currentProgress = JsonUtility.FromJson<GameProgressData>(jsonText) ?? new GameProgressData();
             }
             catch (System.Exception exception)
             {
                 Debug.LogError($"Could not load progression. Resetting to defaults: {exception.Message}");
-                currentProgress = new GameProgressData();
+                createDefaultProfile();
             }
         }
+        else createDefaultProfile();
 
-        EnsureProgressCollections();
+        // EnsureProgressCollections();
     }
 
-    private void EnsureProgressCollections()
+    private void createDefaultProfile()
     {
-        currentProgress ??= new GameProgressData();
-        currentProgress.unlockedCatIDs ??= new List<string>();
-        currentProgress.unlockedClothesIDs ??= new List<string>();
-        currentProgress.unlockedAchievements ??= new List<string>();
-        currentProgress.purchasedExpansionIDs ??= new List<string>();
+        GameData = new PlayerSaveProfile();
+        GameData.unlockedMapIDs.AddRange(new int[] {1,2,3,4});
+        GameData.unlockedClothingIDs.AddRange(new int[]{1,7,9,14,25});
+        SaveGameData();
     }
+
+    // private void EnsureProgressCollections()
+    // {
+    //     currentProgress ??= new GameProgressData();
+    //     currentProgress.unlockedCatIDs ??= new List<string>();
+    //     currentProgress.unlockedClothesIDs ??= new List<string>();
+    //     currentProgress.unlockedAchievements ??= new List<string>();
+    //     currentProgress.purchasedExpansionIDs ??= new List<string>();
+    // }
 
     // --- Progression, Lobbies, and Achievement Logic ---
     public void AwardProgressAchievement(string achievementID, bool isPrivateLobby)
@@ -115,4 +144,62 @@ public class SaveSystem : MonoBehaviour
         SaveGameData();
         Debug.Log("Premium Lazy Bypass Activated. All content unlocked via payment simulation!");
     }
+    // Ensure the casing matches EXACTLY what NetworkCatController is looking for!
+    public CatBreedData GetCatBreedByID(int id)
+    {
+        if (masterCatDatabase != null && masterCatDatabase.TryGetValue(id, out CatBreedData data))
+        {
+            return data;
+        }
+        
+        Debug.LogError($"[DATABASE ERROR] Attempted to query invalid Cat Breed ID: {id}");
+        return null;
+    }
+
+    #region Cryptography Engine Engines
+    private byte[] EncryptStringToBytes(string plainText, string secretKey)
+    {
+        byte[] keyBytes = Encoding.UTF8.GetBytes(secretKey);
+        byte[] ivBytes = new byte[16];
+        Array.Copy(keyBytes, ivBytes, 16); // Mirror initial vectors out for simple parsing loops
+
+        using (Aes aesEngine = Aes.Create())
+        {
+            aesEngine.Key = keyBytes;
+            aesEngine.IV = ivBytes;
+            using (MemoryStream memoryStream = new MemoryStream())
+            {
+                using (CryptoStream cryptoStream = new CryptoStream(memoryStream, aesEngine.CreateEncryptor(), CryptoStreamMode.Write))
+                {
+                    byte[] inputBytes = Encoding.UTF8.GetBytes(plainText);
+                    cryptoStream.Write(inputBytes, 0, inputBytes.Length);
+                    cryptoStream.FlushFinalBlock();
+                    return memoryStream.ToArray();
+                }
+            }
+        }
+    }
+    private string DecryptStringFromBytes(byte[] cipherData, string secretKey)
+    {
+        byte[] keyBytes = Encoding.UTF8.GetBytes(secretKey);
+        byte[] ivBytes = new byte[16];
+        Array.Copy(keyBytes, ivBytes, 16);
+
+        using (Aes aesEngine = Aes.Create())
+        {
+            aesEngine.Key = keyBytes;
+            aesEngine.IV = ivBytes;
+            using (MemoryStream memoryStream = new MemoryStream(cipherData))
+            {
+                using (CryptoStream cryptoStream = new CryptoStream(memoryStream, aesEngine.CreateDecryptor(), CryptoStreamMode.Read))
+                {
+                    using (StreamReader streamReader = new StreamReader(cryptoStream))
+                    {
+                        return streamReader.ReadToEnd();
+                    }
+                }
+            }
+        }
+    }
+    #endregion
 }

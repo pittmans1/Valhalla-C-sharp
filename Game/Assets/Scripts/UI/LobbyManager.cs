@@ -171,6 +171,10 @@ public class LobbyManager : MonoBehaviour
         Debug.Log($"Handing execution commands over to PlayerSpawner. Loading gameplay level scene zones now...");
         
         PlayerSpawner.Instance.SpawnAllPlayers(launchProfilesList);
+        if (MenuController.Instance != null)
+        {
+            MenuController.Instance.EnterGameplaySession();
+        }
         gameObject.SetActive(false);
     }
 }

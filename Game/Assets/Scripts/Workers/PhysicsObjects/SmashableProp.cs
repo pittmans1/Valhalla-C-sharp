@@ -1,6 +1,5 @@
 using UnityEngine;
 
-// REMOVED the namespace block wrapper so it compiles globally with your manager hooks!
 public class SmashableProp : MonoBehaviour
 {
     [Header("Scoring Profile")]
@@ -9,16 +8,81 @@ public class SmashableProp : MonoBehaviour
 
     [Header("Physics Limits")]
     [SerializeField] private float breakForceThreshold = 5.0f;
+    [SerializeField] private float damageResistance = 0f;
     [SerializeField] private GameObject brokenPrefab;
-    
+    [SerializeField] private PropFragmentPool fragmentPool;
+
+    public string ItemTypeTag => itemTypeTag;
+    public int PointValue => pointValue;
+    public float EffectiveBreakThreshold => breakForceThreshold + damageResistance;
+    public bool IsBroken => isBroken;
+
     private bool isBroken = false;
+    private DestructiblePropRegistry registry;
+
+    private void Awake()
+    {
+        registry = DestructiblePropRegistry.Instance;
+        if (registry != null)
+        {
+            registry.RegisterProp(this);
+            fragmentPool = registry.FragmentPool;
+        }
+    }
+
+    private void OnEnable()
+    {
+        if (registry == null)
+        {
+            registry = DestructiblePropRegistry.Instance;
+        }
+
+        if (registry != null)
+        {
+            registry.RegisterProp(this);
+            fragmentPool ??= registry.FragmentPool;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (registry != null)
+        {
+            registry.UnregisterProp(this);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (registry != null)
+        {
+            registry.UnregisterProp(this);
+        }
+    }
 
     private void OnCollisionEnter(Collision collision)
     {
-        if (collision.relativeVelocity.magnitude > breakForceThreshold)
+        if (isBroken)
         {
-            Break(collision.relativeVelocity.magnitude, null, 0f, 0f);
+            return;
         }
+
+        float impactMagnitude = collision.relativeVelocity.magnitude;
+        if (impactMagnitude > breakForceThreshold)
+        {
+            Vector3 hitPoint = collision.contacts.Length > 0 ? collision.GetContact(0).point : transform.position;
+            DamageResolver.Resolve(this, impactMagnitude, DestructibleDamageType.Impact, hitPoint, collision.relativeVelocity.normalized, collision.collider.gameObject);
+        }
+    }
+
+    public void ApplyDamage(float force, DestructibleDamageType damageType = DestructibleDamageType.Impact, Vector3? hitPoint = null, Vector3? hitDirection = null, GameObject sourceObject = null, int sourcePlayerId = -1)
+    {
+        if (isBroken || force <= 0f)
+        {
+            return;
+        }
+
+        DamageResolver.Resolve(this, force, damageType, hitPoint ?? transform.position, hitDirection ?? Vector3.up, sourceObject, sourcePlayerId);
     }
 
     public void ApplyExplosion()
@@ -28,77 +92,68 @@ public class SmashableProp : MonoBehaviour
 
     public void ApplyExplosion(Vector3 origin, float blastForce, float radius)
     {
-        Break(breakForceThreshold + 1f, origin, blastForce, radius);
+        float force = breakForceThreshold + 1f + Mathf.Max(blastForce, 0f);
+        DamageResolver.Resolve(this, force, DestructibleDamageType.Explosion, origin, (transform.position - origin).normalized, gameObject);
     }
 
-    private void Break(float impactForce, Vector3? explosionOrigin, float blastForce, float radius)
+    public void TriggerBreak(DestructibleDamageType damageType, float force, Vector3 hitPoint, Vector3 hitDirection, GameObject sourceObject = null, int sourcePlayerId = -1)
     {
-        if (isBroken) return;
+        if (isBroken)
+        {
+            return;
+        }
 
         isBroken = true;
-        Debug.Log($"{itemTypeTag} was completely smashed with a force of {impactForce}!");
+        Debug.Log($"{itemTypeTag} was completely smashed with a force of {force} via {damageType}!");
 
-        if (GameModeManager.Instance != null)
+        if (DestructionEventBus.Instance != null)
+        {
+            DestructionEventBus.Instance.PublishPropDestroyed(this, damageType, force, hitPoint, hitDirection, sourceObject, sourcePlayerId);
+        }
+        else if (GameModeManager.Instance != null)
         {
             GameModeManager.Instance.OnItemDestroyed(itemTypeTag, pointValue);
         }
 
+        if (DestructiblePropRegistry.Instance != null)
+        {
+            DestructiblePropRegistry.Instance.NotifyDestroyed(this, new DestructibleHitInfo
+            {
+                damageType = damageType,
+                force = force,
+                hitPoint = hitPoint,
+                hitDirection = hitDirection,
+                sourceObject = sourceObject,
+                sourcePlayerId = sourcePlayerId,
+                damageValue = force
+            });
+        }
+
         if (brokenPrefab != null)
         {
-            GameObject fragments = Instantiate(brokenPrefab, transform.position, transform.rotation);
-            fragments.transform.localScale = transform.lossyScale;
+            GameObject fragments = fragmentPool != null
+                ? fragmentPool.GetFragments(brokenPrefab, transform.position, transform.rotation)
+                : Instantiate(brokenPrefab, transform.position, transform.rotation);
 
-            if (explosionOrigin.HasValue && blastForce > 0f && radius > 0f)
+            if (fragments != null)
             {
-                foreach (Rigidbody fragment in fragments.GetComponentsInChildren<Rigidbody>())
+                fragments.transform.localScale = transform.lossyScale;
+
+                if (damageType == DestructibleDamageType.Explosion)
                 {
-                    fragment.AddExplosionForce(blastForce, explosionOrigin.Value, radius, 1f, ForceMode.Impulse);
+                    foreach (Rigidbody fragment in fragments.GetComponentsInChildren<Rigidbody>())
+                    {
+                        fragment.AddExplosionForce(force * 2f, hitPoint, 8f, 1f, ForceMode.Impulse);
+                    }
+                }
+
+                if (fragmentPool != null)
+                {
+                    fragmentPool.ReturnFragments(fragments, 4f);
                 }
             }
         }
 
         Destroy(gameObject);
-    }
-
-
-    public void reportSmashedPropToDataEngine()
-    {
-        if (SaveSystem.Instance == null || SaveSystem.Instance.GameData == null)
-        {
-            Debug.LogWarning("[DATA SAFETY] Blocked prop smash report tracking: SaveSystem data structure is not online yet.");
-            return;
-        }
-            // Fail-Safe 2: Ensure the stats profile sub-object is valid before modifying properties
-        if (SaveSystem.Instance.GameData.playerStats != null)
-        {
-            SaveSystem.Instance.GameData.playerStats.totalPropsSmashed++;
-        }
-
-        // Fail-Safe 3: Ensure the active mission collection isn't null before entering the loop
-        if (SaveSystem.Instance.GameData.activeMissions == null)
-        {
-            Debug.LogWarning("[DATA SAFETY] Mission list is null. Aborting progression evaluation pass.");
-            return;
-        }
-        SaveSystem.Instance.GameData.playerStats.totalPropsSmashed++;
-
-        foreach (var mission in SaveSystem.Instance.GameData.activeMissions)
-        {
-            if (mission == null) continue;
-            if(mission.completeType == "smashables" && !mission.isCompleted)
-            {
-                if (mission.completeAmount <= 0)
-                {
-                    Debug.LogError($"[DATA ERROR] Mission ID {mission.missionID} possesses an invalid or missing completion target value of: {mission.completeAmount}. Progress halted to prevent exploits.");
-                    continue; 
-                }
-                mission.currentProgress++;
-                if(mission.currentProgress >= mission.completeAmount)
-                {
-                    mission.isCompleted = true;
-                    Debug.Log($"[MISSION COMPLETED] Mission ID {mission.missionID} has been successfully cleared!");
-                }
-            }
-        }
     }
 }

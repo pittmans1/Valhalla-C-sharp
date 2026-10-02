@@ -100,15 +100,6 @@ public class SaveSystem : MonoBehaviour
         SaveGameData();
     }
 
-    // private void EnsureProgressCollections()
-    // {
-    //     currentProgress ??= new GameProgressData();
-    //     currentProgress.unlockedCatIDs ??= new List<string>();
-    //     currentProgress.unlockedClothesIDs ??= new List<string>();
-    //     currentProgress.unlockedAchievements ??= new List<string>();
-    //     currentProgress.purchasedExpansionIDs ??= new List<string>();
-    // }
-
     // --- Progression, Lobbies, and Achievement Logic ---
     public void AwardProgressAchievement(string achievementID, bool isPrivateLobby)
     {

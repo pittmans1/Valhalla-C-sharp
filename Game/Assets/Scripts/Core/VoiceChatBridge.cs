@@ -13,6 +13,8 @@ public class VoiceChatBridge : MonoBehaviour
     [Header("Network Players Volume Attenuation Map")]
 
     private Dictionary<string, float> remotePlayerVolumeMap = new Dictionary<string, float>();
+    private HashSet<string> friendPlayerIDs = new HashSet<string>();
+    private bool autoMuteNonFriends;
 
     private void Awake ()
     {
@@ -26,6 +28,7 @@ public class VoiceChatBridge : MonoBehaviour
 
     private void Start ()
     {
+        autoMuteNonFriends = PlayerPrefs.GetInt("AutoMuteNonFriends", 0) == 1;
         ScanAndInitializeLocalMicrophone();
     }
 
@@ -89,6 +92,31 @@ public class VoiceChatBridge : MonoBehaviour
             remotePlayerVolumeMap.Add(playerID, individualVolumeScale);
 
         // TODO : final network audio framework or native (photon voice or vivax) pass float value straigh to player speaker stream.
+    }
+
+    public void SetAutoMuteNonFriends(bool enabled)
+    {
+        autoMuteNonFriends = enabled;
+        PlayerPrefs.SetInt("AutoMuteNonFriends", enabled ? 1 : 0);
+    }
+
+    public void SetPlayerFriendStatus(string playerID, bool isFriend)
+    {
+        if (string.IsNullOrWhiteSpace(playerID)) return;
+
+        if (isFriend) friendPlayerIDs.Add(playerID);
+        else friendPlayerIDs.Remove(playerID);
+    }
+
+    public bool IsRemotePlayerMuted(string playerID)
+    {
+        return autoMuteNonFriends && !friendPlayerIDs.Contains(playerID);
+    }
+
+    public float GetEffectiveRemotePlayerIncomingVolume(string playerID)
+    {
+        if (IsRemotePlayerMuted(playerID)) return 0f;
+        return remotePlayerVolumeMap.TryGetValue(playerID, out float volume) ? volume : 1f;
     }
 
 }

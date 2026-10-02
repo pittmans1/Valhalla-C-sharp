@@ -46,8 +46,14 @@ public class HumanBrain : MonoBehaviour
 
     private void Start()
     {
+        playerLookSensitivity = PlayerPrefs.GetFloat("HumanLookSensitivity", playerLookSensitivity);
         rb.freezeRotation = true;
         ToggleControlState();
+    }
+
+    public void SetPlayerLookSensitivity(float sensitivity)
+    {
+        playerLookSensitivity = Mathf.Max(0.1f, sensitivity);
     }
 
     private void Update()
